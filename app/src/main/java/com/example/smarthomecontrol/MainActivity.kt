@@ -1,47 +1,52 @@
 package com.example.smarthomecontrol
 
+import android.content.Intent
 import android.os.Bundle
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import android.widget.Spinner
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.smarthomecontrol.ui.theme.SmartHomeControlTheme
 
 class MainActivity : ComponentActivity() {
+
+    private var isInitialSelection = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            SmartHomeControlTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+        setContentView(R.layout.activity_main)
+
+        val spinner = findViewById<Spinner>(R.id.gesture_spinner)
+
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            GestureConstants.gestureDisplayNames
+        )
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        spinner.adapter = adapter
+
+        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(
+                parent: AdapterView<*>?,
+                view: View?,
+                position: Int,
+                id: Long
+            ) {
+                if (isInitialSelection) {
+                    isInitialSelection = false
+                    return
                 }
+
+                val displayName = GestureConstants.gestureDisplayNames[position]
+                val gestureLabel = GestureConstants.gestureLabelMap[displayName] ?: return
+
+                val intent = Intent(this@MainActivity, GestureActivity::class.java)
+                intent.putExtra(GestureConstants.EXTRA_GESTURE_LABEL, gestureLabel)
+                startActivity(intent)
             }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SmartHomeControlTheme {
-        Greeting("Android")
     }
 }
