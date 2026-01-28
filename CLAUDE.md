@@ -12,7 +12,7 @@ SmartHomeControl is an Android application for controlling smart home devices us
 **Target Device:** Pixel 9
 **Target API:** API 35 or above
 
-> **Current state:** The repository scaffolding was generated with Kotlin/Jetpack Compose. Per course requirements, production feature code MUST be written in **Java**. The existing Kotlin/Compose scaffolding may coexist during the transition but all new feature code should be Java.
+> **Current state:** The repository uses Kotlin and Jetpack Compose. All feature code MUST be written in **Kotlin**.
 
 ## Behavioral Principles
 
@@ -39,7 +39,7 @@ Use exact file names and gesture labels as specified in the ASU CSE 535 Overview
 ### 4. No-Face Privacy Rule
 
 When implementing any camera or video recording logic, always include comments and safeguards reminding the user that recorded videos **must NOT show the user's face**. Add explicit comments at camera initialization and recording start points:
-```java
+```kotlin
 // PRIVACY: Ensure the camera captures ONLY hand gestures.
 // Videos must NOT show the user's face per ASU CSE 535 requirements.
 ```
@@ -50,8 +50,8 @@ When implementing any camera or video recording logic, always include comments a
 |-------------------|--------------------------------------------|
 | Target Device     | Pixel 9                                    |
 | Target API        | API 35 or above                            |
-| Language          | Java (course standard for Android Studio)  |
-| UI Framework      | Android Views / XML layouts                |
+| Language          | Kotlin                                     |
+| UI Framework      | Jetpack Compose                            |
 | Testing           | JUnit 4 (unit), Espresso (UI/instrumented) |
 | Networking        | Standard Flask-compatible HTTP libraries   |
 | Libraries         | AndroidX, Espresso, standard networking    |
@@ -67,14 +67,13 @@ SmartHomeControl/
 │       ├── main/
 │       │   ├── AndroidManifest.xml   # App manifest (single activity entry)
 │       │   ├── java/com/example/smarthomecontrol/
-│       │   │   ├── MainActivity.kt   # Current entry point (Kotlin scaffold)
-│       │   │   └── ui/theme/         # Compose theme (scaffold only)
+│       │   │   ├── MainActivity.kt   # Entry point, Compose host
+│       │   │   └── ui/theme/         # Material 3 theme definitions
 │       │   │       ├── Color.kt
 │       │   │       ├── Theme.kt
 │       │   │       └── Type.kt
 │       │   └── res/                  # Android resources
 │       │       ├── drawable/         # Vector drawables
-│       │       ├── layout/           # XML layouts (add here for new screens)
 │       │       ├── mipmap-*/         # Density-specific app icons (WebP)
 │       │       ├── values/           # colors.xml, strings.xml, themes.xml
 │       │       └── xml/              # Backup and data extraction rules
@@ -96,13 +95,16 @@ SmartHomeControl/
 
 | Component          | Technology                    | Version       |
 |--------------------|-------------------------------|---------------|
-| Language           | Java (primary), Kotlin (scaffold) | Java 11 target |
+| Language           | Kotlin                        | 2.0.21        |
 | Build System       | Gradle (Kotlin DSL)           | 8.13          |
 | Android Plugin     | AGP                           | 8.13.2        |
 | Min SDK            | Android API 24                | (Android 7.0) |
 | Target/Compile SDK | Android API 36                |               |
+| UI Framework       | Jetpack Compose               | BOM 2024.09.00 |
+| Design System      | Material Design 3             | latest        |
 | Unit Testing       | JUnit 4                       | 4.13.2        |
 | UI Testing         | Espresso                      | 3.7.0         |
+| Compose Testing    | Compose UI Test JUnit4        | (via BOM)     |
 | AndroidX Test      | AndroidX Test JUnit           | 1.3.0         |
 
 ## Build & Run
@@ -128,42 +130,44 @@ SmartHomeControl/
 
 ### App Architecture
 
-- **Single Activity** entry point (`MainActivity`), with additional activities as required by the assignment
-- **XML layouts** for all new UI screens — place layout files in `res/layout/`
-- **Java source files** for all new feature code under `app/src/main/java/com/example/smarthomecontrol/`
+- **Single Activity** entry point (`MainActivity`), using `ComponentActivity` with Compose
+- **Compose-only UI:** All UI is declarative Jetpack Compose — no XML layouts
+- **Edge-to-edge:** `enableEdgeToEdge()` is enabled for modern display support
+- **Scaffold-based layout:** Uses Material 3 `Scaffold` as the root layout container
+- **Kotlin source files** for all feature code under `app/src/main/java/com/example/smarthomecontrol/`
 
 ### Package Organization
 
 Source code lives under `com.example.smarthomecontrol`. Organize by feature:
 ```
 com.example.smarthomecontrol/
-├── MainActivity.java          # Main entry point
+├── MainActivity.kt            # Main entry point
 ├── gesture/                   # Gesture recognition and classification
 ├── devices/                   # Smart home device models and control
 ├── camera/                    # Camera capture and video recording
 ├── network/                   # Flask server communication / uploads
-└── ui/                        # Shared UI components and adapters
+└── ui/                        # Shared UI components, theme, and composables
 ```
 
-### Java Conventions
+### Kotlin & Compose Conventions
 
-- **Naming:** PascalCase for classes; camelCase for methods and variables; UPPER_SNAKE_CASE for constants
-- **File naming:** One public class per file; file name matches the class name
-- **Activities:** Extend `AppCompatActivity`; register in `AndroidManifest.xml`
+- **Naming:** PascalCase for classes and `@Composable` functions; camelCase for regular functions and properties; UPPER_SNAKE_CASE for constants
+- **File naming:** File name matches the primary class/composable name within the file
+- **Composables:** Accept a `modifier: Modifier = Modifier` parameter; use `@Preview` annotations for development previews
+- **Theme:** Use `SmartHomeControlTheme` wrapper composable; supports light/dark mode and dynamic colors (Android 12+)
 - **Gesture labels:** Use the exact label strings from the ASU CSE 535 specification — do not rename or abbreviate
 
 ### Dependency Management
 
 All dependency versions are centralized in `gradle/libs.versions.toml`. Reference libraries using the version catalog syntax in build scripts (e.g., `libs.androidx.core.ktx`). Do not hardcode version strings in `build.gradle.kts` files.
 
-When adding new dependencies for Java-based features (e.g., CameraX, OkHttp, Retrofit), add them to `libs.versions.toml` first, then reference in `app/build.gradle.kts`.
+When adding new dependencies (e.g., CameraX, OkHttp, Retrofit), add them to `libs.versions.toml` first, then reference in `app/build.gradle.kts`.
 
 ### Resource Conventions
 
-- **Strings:** Defined in `res/values/strings.xml` — avoid hardcoded strings in Java code
-- **Colors:** XML colors in `res/values/colors.xml`
-- **Layouts:** XML layouts in `res/layout/` — use descriptive names (e.g., `activity_main.xml`, `fragment_gesture.xml`)
-- **Themes:** XML theme in `res/values/themes.xml`
+- **Strings:** Defined in `res/values/strings.xml` — avoid hardcoded strings in Kotlin code
+- **Colors:** XML colors in `res/values/colors.xml` for non-Compose contexts; Compose colors in `ui/theme/Color.kt`
+- **Themes:** XML theme in `res/values/themes.xml` (for system/manifest); Compose theme in `ui/theme/Theme.kt`
 - **Icons:** Adaptive icons with separate foreground/background layers
 
 ## Testing
@@ -189,7 +193,7 @@ Every feature must follow this cycle:
 ### Instrumented / Espresso Tests (`src/androidTest/`)
 
 - Run on a Pixel 9 device or emulator (API 35+)
-- Frameworks: AndroidX Test, Espresso
+- Frameworks: AndroidX Test, Espresso, Compose UI Test
 - Runner: `androidx.test.runner.AndroidJUnitRunner`
 - Location: `app/src/androidTest/java/com/example/smarthomecontrol/`
 - Run: `./gradlew connectedAndroidTest`
@@ -199,8 +203,9 @@ Every feature must follow this cycle:
 
 - Place unit tests under `src/test/` mirroring the source package structure
 - Place Espresso and device-dependent tests under `src/androidTest/`
-- Name test classes with a `Test` suffix (e.g., `GestureClassifierTest.java`)
+- Name test classes with a `Test` suffix (e.g., `GestureClassifierTest.kt`)
 - Name test methods descriptively: `test_swipeLeftGesture_returnsCorrectLabel()`
+- Use Compose testing APIs (`createComposeRule`, `onNodeWithText`, etc.) for composable tests
 
 ## Camera & Video Recording Guidelines
 
@@ -209,7 +214,7 @@ When implementing camera features:
 1. Add the `CAMERA` permission to `AndroidManifest.xml`
 2. Request runtime camera permission on API 23+
 3. At every camera initialization and recording start, include the privacy comment:
-   ```java
+   ```kotlin
    // PRIVACY: Ensure the camera captures ONLY hand gestures.
    // Videos must NOT show the user's face per ASU CSE 535 requirements.
    ```
@@ -220,7 +225,7 @@ When implementing camera features:
 
 - The app uploads gesture data to a Flask-based backend server
 - Use standard HTTP libraries compatible with Flask (e.g., OkHttp, HttpURLConnection, Retrofit)
-- Handle network operations on background threads (use `AsyncTask`, `ExecutorService`, or Kotlin coroutines if in Kotlin scope)
+- Handle network operations off the main thread (use Kotlin coroutines)
 - Add the `INTERNET` permission to `AndroidManifest.xml`
 
 ## Configuration Details
@@ -251,32 +256,38 @@ Excludes: build artifacts (`.apk`, `.aab`, `.dex`), IDE files (`.idea/`, `*.iml`
 
 | File | Purpose |
 |------|---------|
-| `app/src/main/java/.../MainActivity.kt` | Current app entry point (scaffold) |
+| `app/src/main/java/.../MainActivity.kt` | App entry point, Compose host |
+| `app/src/main/java/.../ui/theme/Theme.kt` | Material 3 theme provider |
+| `app/src/main/java/.../ui/theme/Color.kt` | Color definitions (light/dark palettes) |
+| `app/src/main/java/.../ui/theme/Type.kt` | Typography configuration |
 | `app/src/main/AndroidManifest.xml` | App manifest, activity/permission declarations |
 | `app/build.gradle.kts` | App module build configuration |
 | `gradle/libs.versions.toml` | Centralized dependency versions |
 | `settings.gradle.kts` | Project-level Gradle settings |
 | `gradle.properties` | JVM and build flags |
 | `app/src/main/res/values/strings.xml` | String resources |
-| `app/src/main/res/values/themes.xml` | App theme definition |
+| `app/src/main/res/values/themes.xml` | App theme definition (system/manifest) |
 
 ## Rules for AI Assistants
 
 ### Must Do
 - **Write tests FIRST** — always produce the failing test before the implementation
-- **Use Java** for all new feature code (course requirement)
-- **Use XML layouts** for new UI screens — do not add Jetpack Compose UI
+- **Use Kotlin** for all source code — do not introduce Java source files
+- **Use Jetpack Compose** for all UI — do not add XML layouts or View-based UI code
 - **Use exact gesture labels and file names** from the ASU CSE 535 specification
 - **Include privacy comments** at all camera/recording entry points
 - **Use the version catalog** (`libs.versions.toml`) when adding dependencies
 - **Target Pixel 9** with API 35+ — test against this configuration
 - **Follow the Red-Green-Refactor cycle** for every task
-- **Register new activities** in `AndroidManifest.xml`
+- **Follow Material 3** design patterns and use the existing theme system
+- **Add new screens** as composable functions, not new activities
 
 ### Must Not Do
 - Do not skip writing tests before implementation
+- Do not introduce Java source files — this is a Kotlin-only project
+- Do not add XML layouts — all UI must be Jetpack Compose
 - Do not use Groovy build scripts — the project uses Gradle Kotlin DSL (`.gradle.kts`)
-- Do not hardcode strings in Java code — use `strings.xml`
+- Do not hardcode strings in Kotlin code — use `strings.xml`
 - Do not commit video files (`.mp4`, `.avi`) — they are gitignored
 - Do not record or display the user's face in camera features
 - Do not introduce non-AndroidX support libraries
