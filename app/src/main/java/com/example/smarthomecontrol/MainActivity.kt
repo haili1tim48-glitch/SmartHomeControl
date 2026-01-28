@@ -1,47 +1,69 @@
 package com.example.smarthomecontrol
 
+import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.smarthomecontrol.ui.theme.SmartHomeControlTheme
+import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
+import androidx.appcompat.app.AppCompatActivity
+import com.example.smarthomecontrol.databinding.ActivityMainBinding
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var binding: ActivityMainBinding
+    private var selectedGesture: Gesture? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
-        setContent {
-            SmartHomeControlTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        setupGestureSpinner()
+        setupNextButton()
+    }
+
+    private fun setupGestureSpinner() {
+        val gestureNames = Gesture.ALL_GESTURES.map { it.displayName }
+
+        val adapter = ArrayAdapter(
+            this,
+            android.R.layout.simple_spinner_item,
+            gestureNames
+        ).apply {
+            setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        }
+
+        binding.gestureSpinner.adapter = adapter
+
+        binding.gestureSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                selectedGesture = Gesture.ALL_GESTURES[position]
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {
+                selectedGesture = null
+            }
+        }
+
+        // Select first item by default
+        if (Gesture.ALL_GESTURES.isNotEmpty()) {
+            binding.gestureSpinner.setSelection(0)
+            selectedGesture = Gesture.ALL_GESTURES[0]
+        }
+    }
+
+    private fun setupNextButton() {
+        binding.nextButton.setOnClickListener {
+            selectedGesture?.let { gesture ->
+                val intent = Intent(this, VideoPlayActivity::class.java).apply {
+                    putExtra(EXTRA_GESTURE_NAME, gesture.name)
                 }
+                startActivity(intent)
             }
         }
     }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    SmartHomeControlTheme {
-        Greeting("Android")
+    companion object {
+        const val EXTRA_GESTURE_NAME = "extra_gesture_name"
     }
 }
