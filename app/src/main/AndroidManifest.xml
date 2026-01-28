@@ -23,7 +23,7 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".GestureActivity"
+            android:name=".ExpertVideoActivity"
             android:exported="false"
             android:theme="@style/Theme.SmartHomeControl" />
     </application>

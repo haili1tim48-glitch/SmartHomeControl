@@ -34,4 +34,24 @@ object GestureConstants {
         "8" to "Num8",
         "9" to "Num9"
     )
+
+    val videoResourceMap = mapOf(
+        "Num0" to "h_0",
+        "Num1" to "h_1",
+        "Num2" to "h_2",
+        "Num3" to "h_3",
+        "Num4" to "h_4",
+        "Num5" to "h_5",
+        "Num6" to "h_6",
+        "Num7" to "h_7",
+        "Num8" to "h_8",
+        "Num9" to "h_9",
+        "LightOn" to "h_lighton",
+        "LightOff" to "h_lightoff",
+        "FanOn" to "h_fanon",
+        "FanOff" to "h_fanoff",
+        "FanUp" to "h_increasefanspeed",
+        "FanDown" to "h_decreasefanspeed",
+        "Set Thermo" to "h_setthermo"
+    )
 }

@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
             val displayName = spinner.selectedItem as? String ?: return@setOnClickListener
             val gestureLabel = GestureConstants.gestureLabelMap[displayName] ?: return@setOnClickListener
 
-            val intent = Intent(this, GestureActivity::class.java)
+            val intent = Intent(this, ExpertVideoActivity::class.java)
             intent.putExtra(GestureConstants.EXTRA_GESTURE_LABEL, gestureLabel)
             startActivity(intent)
         }
