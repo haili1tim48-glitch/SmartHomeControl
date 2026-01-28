@@ -1,0 +1,25 @@
+# Android
+*.apk
+*.ap_
+*.aab
+*.dex
+*.class
+bin/
+gen/
+out/
+build/
+.gradle/
+local.properties
+*.iml
+.idea/
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
+
+# Videos
+*.mp4
+*.avi
+videos/
+uploads/
+Expert-Gestures/
