@@ -2,21 +2,19 @@ package com.example.smarthomecontrol
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
-import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.Spinner
 import androidx.activity.ComponentActivity
 
 class MainActivity : ComponentActivity() {
-
-    private var isInitialSelection = true
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         val spinner = findViewById<Spinner>(R.id.gesture_spinner)
+        val btnConfirm = findViewById<Button>(R.id.btn_confirm_gesture)
 
         val adapter = ArrayAdapter(
             this,
@@ -26,27 +24,13 @@ class MainActivity : ComponentActivity() {
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         spinner.adapter = adapter
 
-        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(
-                parent: AdapterView<*>?,
-                view: View?,
-                position: Int,
-                id: Long
-            ) {
-                if (isInitialSelection) {
-                    isInitialSelection = false
-                    return
-                }
+        btnConfirm.setOnClickListener {
+            val displayName = spinner.selectedItem as? String ?: return@setOnClickListener
+            val gestureLabel = GestureConstants.gestureLabelMap[displayName] ?: return@setOnClickListener
 
-                val displayName = GestureConstants.gestureDisplayNames[position]
-                val gestureLabel = GestureConstants.gestureLabelMap[displayName] ?: return
-
-                val intent = Intent(this@MainActivity, GestureActivity::class.java)
-                intent.putExtra(GestureConstants.EXTRA_GESTURE_LABEL, gestureLabel)
-                startActivity(intent)
-            }
-
-            override fun onNothingSelected(parent: AdapterView<*>?) {}
+            val intent = Intent(this, GestureActivity::class.java)
+            intent.putExtra(GestureConstants.EXTRA_GESTURE_LABEL, gestureLabel)
+            startActivity(intent)
         }
     }
 }
