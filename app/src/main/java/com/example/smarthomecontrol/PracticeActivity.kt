@@ -3,31 +3,60 @@ package com.example.smarthomecontrol
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.CountDownTimer
+import android.util.Log
+import android.view.View
 import android.widget.Button
-import android.widget.Toast
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 class PracticeActivity : ComponentActivity() {
 
+    companion object {
+        private const val TAG = "PracticeActivity"
+    }
+
     private var gestureLabel: String = ""
     private lateinit var viewFinder: PreviewView
     private lateinit var cameraExecutor: ExecutorService
     private var cameraProvider: ProcessCameraProvider? = null
+    private lateinit var permissionErrorLayout: LinearLayout
+    private lateinit var tvErrorMessage: TextView
+    private lateinit var btnRetryPermission: Button
+
+    // Recording related
+    private lateinit var tvTimer: TextView
+    private lateinit var btnRecord: Button
+    private var videoCapture: VideoCapture<Recorder>? = null
+    private var currentRecording: Recording? = null
+    private var countDownTimer: CountDownTimer? = null
+    private var currentLensFacing: Int = CameraSelector.LENS_FACING_FRONT
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
             if (isGranted) {
+                hidePermissionError()
                 onCameraPermissionGranted()
             } else {
-                Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
+                Log.w(TAG, "Camera permission denied by user")
+                showPermissionError("需要相机权限才能使用此功能")
             }
         }
 
@@ -39,10 +68,23 @@ class PracticeActivity : ComponentActivity() {
 
         viewFinder = findViewById(R.id.viewFinder)
         cameraExecutor = Executors.newSingleThreadExecutor()
+        permissionErrorLayout = findViewById(R.id.permissionErrorLayout)
+        tvErrorMessage = findViewById(R.id.tvErrorMessage)
+        btnRetryPermission = findViewById(R.id.btnRetryPermission)
+        tvTimer = findViewById(R.id.tv_timer)
+        btnRecord = findViewById(R.id.btn_record)
 
         val btnBack = findViewById<Button>(R.id.btn_back_to_expert)
         btnBack.setOnClickListener {
             finish()
+        }
+
+        btnRetryPermission.setOnClickListener {
+            requestPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+
+        btnRecord.setOnClickListener {
+            startRecordingWithCountdown()
         }
 
         checkCameraPermission()
@@ -70,34 +112,168 @@ class PracticeActivity : ComponentActivity() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
-            cameraProvider = cameraProviderFuture.get()
+            try {
+                cameraProvider = cameraProviderFuture.get()
 
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(viewFinder.getSurfaceProvider())
+                val preview = Preview.Builder()
+                    .build()
+                    .also {
+                        it.setSurfaceProvider(viewFinder.getSurfaceProvider())
+                    }
+
+                // Setup video capture with recorder (no audio)
+                val recorder = Recorder.Builder()
+                    .setQualitySelector(QualitySelector.from(Quality.HD))
+                    .build()
+                videoCapture = VideoCapture.withOutput(recorder)
+
+                cameraProvider?.unbindAll()
+
+                // Try front camera first, fallback to back camera
+                if (!tryBindCamera(preview, CameraSelector.LENS_FACING_FRONT)) {
+                    Log.w(TAG, "Front camera not available, trying back camera")
+                    if (!tryBindCamera(preview, CameraSelector.LENS_FACING_BACK)) {
+                        Log.e(TAG, "No camera available on this device")
+                        showCameraError("没有可用的摄像头")
+                    }
                 }
 
-            val cameraSelector = CameraSelector.Builder()
-                .requireLensFacing(CameraSelector.LENS_FACING_FRONT)
-                .build()
-
-            try {
-                cameraProvider?.unbindAll()
-                cameraProvider?.bindToLifecycle(
-                    this,
-                    cameraSelector,
-                    preview
-                )
             } catch (e: Exception) {
-                Toast.makeText(this, "Failed to start camera", Toast.LENGTH_SHORT).show()
+                Log.e(TAG, "Failed to get camera provider", e)
+                e.printStackTrace()
+                showCameraError("相机初始化失败: ${e.localizedMessage}")
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
+    private fun tryBindCamera(preview: Preview, lensFacing: Int): Boolean {
+        val cameraSelector = CameraSelector.Builder()
+            .requireLensFacing(lensFacing)
+            .build()
+
+        return try {
+            // Check if the camera is available
+            val hasCamera = cameraProvider?.hasCamera(cameraSelector) ?: false
+            if (!hasCamera) {
+                Log.d(TAG, "Camera with lens facing $lensFacing not available")
+                return false
+            }
+
+            cameraProvider?.bindToLifecycle(
+                this,
+                cameraSelector,
+                preview,
+                videoCapture
+            )
+            currentLensFacing = lensFacing
+            Log.i(TAG, "Successfully bound to camera with lens facing $lensFacing")
+            hidePermissionError()
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to bind camera with lens facing $lensFacing", e)
+            e.printStackTrace()
+            false
+        }
+    }
+
+    private fun startRecordingWithCountdown() {
+        val videoCapture = videoCapture ?: run {
+            Log.e(TAG, "VideoCapture is not initialized")
+            return
+        }
+
+        // Disable record button and show timer
+        btnRecord.isEnabled = false
+        btnRecord.alpha = 0.5f
+        tvTimer.visibility = View.VISIBLE
+        tvTimer.text = "5"
+
+        // Create output file: [GESTURE]_PRACTICE_1_Liang.mp4
+        val sanitizedGesture = gestureLabel.replace(" ", "_").uppercase()
+        val fileName = "${sanitizedGesture}_PRACTICE_1_Liang.mp4"
+        val outputFile = File(getExternalFilesDir(null), fileName)
+
+        Log.i(TAG, "Recording will be saved to: ${outputFile.absolutePath}")
+
+        // Prepare recording with NO audio
+        val fileOutputOptions = FileOutputOptions.Builder(outputFile).build()
+        val pendingRecording = videoCapture.output
+            .prepareRecording(this, fileOutputOptions)
+            // Note: NOT calling .withAudioEnabled() to disable audio
+
+        // Start recording
+        currentRecording = pendingRecording.start(ContextCompat.getMainExecutor(this)) { event ->
+            when (event) {
+                is VideoRecordEvent.Start -> {
+                    Log.i(TAG, "Recording started")
+                }
+                is VideoRecordEvent.Finalize -> {
+                    if (event.hasError()) {
+                        Log.e(TAG, "Recording error: ${event.error}, cause: ${event.cause}")
+                        currentRecording?.close()
+                        currentRecording = null
+                    } else {
+                        Log.i(TAG, "Recording saved: ${event.outputResults.outputUri}")
+                    }
+                }
+            }
+        }
+
+        // Start 5-second countdown
+        countDownTimer = object : CountDownTimer(5000, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val secondsRemaining = (millisUntilFinished / 1000 + 1).toInt()
+                tvTimer.text = secondsRemaining.toString()
+                Log.d(TAG, "Countdown: $secondsRemaining")
+            }
+
+            override fun onFinish() {
+                stopRecording()
+            }
+        }.start()
+    }
+
+    private fun stopRecording() {
+        countDownTimer?.cancel()
+        countDownTimer = null
+
+        currentRecording?.stop()
+        currentRecording = null
+
+        // Update UI
+        tvTimer.text = "Done!"
+        tvTimer.postDelayed({
+            tvTimer.visibility = View.INVISIBLE
+        }, 1500)
+
+        // Re-enable record button
+        btnRecord.isEnabled = true
+        btnRecord.alpha = 1.0f
+
+        Log.i(TAG, "Recording stopped")
+    }
+
+    private fun showPermissionError(message: String) {
+        tvErrorMessage.text = message
+        permissionErrorLayout.visibility = View.VISIBLE
+        btnRetryPermission.visibility = View.VISIBLE
+    }
+
+    private fun showCameraError(message: String) {
+        tvErrorMessage.text = message
+        permissionErrorLayout.visibility = View.VISIBLE
+        btnRetryPermission.visibility = View.GONE
+    }
+
+    private fun hidePermissionError() {
+        permissionErrorLayout.visibility = View.GONE
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        countDownTimer?.cancel()
+        currentRecording?.stop()
         cameraProvider?.unbindAll()
         cameraExecutor.shutdown()
     }
