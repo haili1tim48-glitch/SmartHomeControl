@@ -10,6 +10,14 @@ import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import okhttp3.Call
+import okhttp3.Callback
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.asRequestBody
+import okhttp3.Response
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -25,8 +33,12 @@ import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.core.content.ContextCompat
 import java.io.File
+import java.io.IOException
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicBoolean
 
 class PracticeActivity : ComponentActivity() {
 
@@ -94,9 +106,7 @@ class PracticeActivity : ComponentActivity() {
         }
 
         btnUpload.setOnClickListener {
-            // TODO: Implement upload logic
-            Toast.makeText(this, "Upload functionality coming soon!", Toast.LENGTH_SHORT).show()
-            finish()
+            uploadVideos()
         }
 
         checkCameraPermission()
@@ -294,6 +304,144 @@ class PracticeActivity : ComponentActivity() {
 
     private fun hidePermissionError() {
         permissionErrorLayout.visibility = View.GONE
+    }
+
+    // Upload progress tracking
+    private val uploadSuccessCount = AtomicInteger(0)
+    private val uploadErrorOccurred = AtomicBoolean(false)
+
+    private fun uploadVideos() {
+        val uploadUrl = "http://10.0.2.2:5000/upload"
+
+        // Reset counters
+        uploadSuccessCount.set(0)
+        uploadErrorOccurred.set(false)
+
+        // Get video files from app's external files directory
+        val videoDir = getExternalFilesDir(null)
+        Log.d("UploadDebug", "Video directory path: ${videoDir?.absolutePath}")
+
+        if (videoDir == null || !videoDir.exists()) {
+            Log.e(TAG, "Video directory not found")
+            Toast.makeText(this, "Video directory not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // List all files in directory for debugging
+        val allFiles = videoDir.listFiles()
+        Log.d("UploadDebug", "All files in directory: ${allFiles?.map { it.name }}")
+
+        // Filter files ending with _Liang.mp4
+        val videoFiles = videoDir.listFiles { file ->
+            file.isFile && file.name.endsWith("_Liang.mp4")
+        }?.sortedBy { it.name }?.toList() ?: emptyList()
+
+        Log.d("UploadDebug", "Filtered video files: ${videoFiles.map { it.name }}")
+
+        if (videoFiles.size < 3) {
+            Log.e(TAG, "Expected 3 videos, found ${videoFiles.size}")
+            Toast.makeText(this, "Not all videos found (${videoFiles.size}/3)", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val filesToUpload = videoFiles.take(3)
+        val totalFiles = filesToUpload.size
+
+        Log.i(TAG, "Found $totalFiles videos to upload")
+        Toast.makeText(this, "Starting upload of $totalFiles videos...", Toast.LENGTH_SHORT).show()
+
+        // Disable upload button during upload
+        btnUpload.isEnabled = false
+        btnUpload.alpha = 0.5f
+
+        // Create OkHttpClient
+        val client = OkHttpClient.Builder()
+            .connectTimeout(60, TimeUnit.SECONDS)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .readTimeout(60, TimeUnit.SECONDS)
+            .build()
+
+        // Upload each file separately using indexed loop
+        for (index in filesToUpload.indices) {
+            val videoFile = filesToUpload[index]
+            val fileNumber = index + 1
+
+            Log.d("UploadDebug", "Starting upload: ${videoFile.name} (file $fileNumber of $totalFiles)")
+
+            // Build multipart request for single file
+            val requestBody = MultipartBody.Builder()
+                .setType(MultipartBody.FORM)
+                .addFormDataPart(
+                    "video",
+                    videoFile.name,
+                    videoFile.asRequestBody("video/mp4".toMediaType())
+                )
+                .build()
+
+            val request = Request.Builder()
+                .url(uploadUrl)
+                .post(requestBody)
+                .build()
+
+            // Capture file info for callback
+            val fileName = videoFile.name
+            val fileNum = fileNumber
+
+            client.newCall(request).enqueue(object : Callback {
+                override fun onFailure(call: Call, e: IOException) {
+                    Log.e("UploadDebug", "Upload FAILED for $fileName: ${e.message}", e)
+
+                    if (uploadErrorOccurred.compareAndSet(false, true)) {
+                        runOnUiThread {
+                            btnUpload.isEnabled = true
+                            btnUpload.alpha = 1.0f
+                            Toast.makeText(
+                                this@PracticeActivity,
+                                "Upload failed for video #$fileNum ($fileName): ${e.message}",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+
+                override fun onResponse(call: Call, response: Response) {
+                    Log.d("UploadDebug", "Server response for $fileName: ${response.code}")
+
+                    if (response.isSuccessful) {
+                        val currentSuccess = uploadSuccessCount.incrementAndGet()
+                        Log.d("UploadDebug", "Successfully sent: $fileName (progress: $currentSuccess / $totalFiles)")
+
+                        if (currentSuccess == totalFiles && !uploadErrorOccurred.get()) {
+                            runOnUiThread {
+                                Log.i(TAG, "All $totalFiles videos uploaded successfully!")
+                                Toast.makeText(
+                                    this@PracticeActivity,
+                                    "All 3 videos uploaded successfully!",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                finish()
+                            }
+                        }
+                    } else {
+                        Log.e("UploadDebug", "Server error for $fileName: ${response.code}")
+
+                        if (uploadErrorOccurred.compareAndSet(false, true)) {
+                            runOnUiThread {
+                                btnUpload.isEnabled = true
+                                btnUpload.alpha = 1.0f
+                                Toast.makeText(
+                                    this@PracticeActivity,
+                                    "Upload failed for video #$fileNum ($fileName): Server error ${response.code}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                }
+            })
+        }
+
+        Log.d("UploadDebug", "All $totalFiles upload requests have been enqueued")
     }
 
     override fun onDestroy() {
