@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -44,10 +45,13 @@ class PracticeActivity : ComponentActivity() {
     // Recording related
     private lateinit var tvTimer: TextView
     private lateinit var btnRecord: Button
+    private lateinit var tvPracticeCount: TextView
+    private lateinit var btnUpload: Button
     private var videoCapture: VideoCapture<Recorder>? = null
     private var currentRecording: Recording? = null
     private var countDownTimer: CountDownTimer? = null
     private var currentLensFacing: Int = CameraSelector.LENS_FACING_FRONT
+    private var currentCount = 1
 
     private val requestPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -56,7 +60,7 @@ class PracticeActivity : ComponentActivity() {
                 onCameraPermissionGranted()
             } else {
                 Log.w(TAG, "Camera permission denied by user")
-                showPermissionError("需要相机权限才能使用此功能")
+                showPermissionError("Camera permission is required to use this feature")
             }
         }
 
@@ -73,6 +77,8 @@ class PracticeActivity : ComponentActivity() {
         btnRetryPermission = findViewById(R.id.btnRetryPermission)
         tvTimer = findViewById(R.id.tv_timer)
         btnRecord = findViewById(R.id.btn_record)
+        tvPracticeCount = findViewById(R.id.tv_practice_count)
+        btnUpload = findViewById(R.id.btn_upload)
 
         val btnBack = findViewById<Button>(R.id.btn_back_to_expert)
         btnBack.setOnClickListener {
@@ -85,6 +91,12 @@ class PracticeActivity : ComponentActivity() {
 
         btnRecord.setOnClickListener {
             startRecordingWithCountdown()
+        }
+
+        btnUpload.setOnClickListener {
+            // TODO: Implement upload logic
+            Toast.makeText(this, "Upload functionality coming soon!", Toast.LENGTH_SHORT).show()
+            finish()
         }
 
         checkCameraPermission()
@@ -134,14 +146,14 @@ class PracticeActivity : ComponentActivity() {
                     Log.w(TAG, "Front camera not available, trying back camera")
                     if (!tryBindCamera(preview, CameraSelector.LENS_FACING_BACK)) {
                         Log.e(TAG, "No camera available on this device")
-                        showCameraError("没有可用的摄像头")
+                        showCameraError("No camera available")
                     }
                 }
 
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to get camera provider", e)
                 e.printStackTrace()
-                showCameraError("相机初始化失败: ${e.localizedMessage}")
+                showCameraError("Camera initialization failed: ${e.localizedMessage}")
             }
 
         }, ContextCompat.getMainExecutor(this))
@@ -189,9 +201,9 @@ class PracticeActivity : ComponentActivity() {
         tvTimer.visibility = View.VISIBLE
         tvTimer.text = "5"
 
-        // Create output file: [GESTURE]_PRACTICE_1_Liang.mp4
+        // Create output file: [GESTURE]_PRACTICE_[COUNT]_Liang.mp4
         val sanitizedGesture = gestureLabel.replace(" ", "_").uppercase()
-        val fileName = "${sanitizedGesture}_PRACTICE_1_Liang.mp4"
+        val fileName = "${sanitizedGesture}_PRACTICE_${currentCount}_Liang.mp4"
         val outputFile = File(getExternalFilesDir(null), fileName)
 
         Log.i(TAG, "Recording will be saved to: ${outputFile.absolutePath}")
@@ -241,17 +253,31 @@ class PracticeActivity : ComponentActivity() {
         currentRecording?.stop()
         currentRecording = null
 
+        Log.i(TAG, "Recording $currentCount stopped")
+
         // Update UI
         tvTimer.text = "Done!"
         tvTimer.postDelayed({
             tvTimer.visibility = View.INVISIBLE
+
+            // Increment count after recording is saved
+            currentCount++
+
+            if (currentCount <= 3) {
+                // Update practice count text and re-enable record button
+                tvPracticeCount.text = "Practice: $currentCount / 3"
+                btnRecord.isEnabled = true
+                btnRecord.alpha = 1.0f
+            } else {
+                // All 3 recordings complete
+                tvPracticeCount.text = "Practice: Complete!"
+                Toast.makeText(this, "All 3 videos recorded!", Toast.LENGTH_LONG).show()
+
+                // Hide record button, show upload button
+                btnRecord.visibility = View.GONE
+                btnUpload.visibility = View.VISIBLE
+            }
         }, 1500)
-
-        // Re-enable record button
-        btnRecord.isEnabled = true
-        btnRecord.alpha = 1.0f
-
-        Log.i(TAG, "Recording stopped")
     }
 
     private fun showPermissionError(message: String) {

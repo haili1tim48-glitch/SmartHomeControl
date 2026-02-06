@@ -8,7 +8,18 @@
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.1" />
+        android:layout_weight="0.05" />
+
+    <!-- Practice counter -->
+    <TextView
+        android:id="@+id/tv_practice_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="Practice: 1 / 3"
+        android:textSize="18sp"
+        android:textColor="@android:color/black"
+        android:layout_marginBottom="8dp" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -50,7 +61,7 @@
                 android:id="@+id/tvErrorMessage"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="需要相机权限才能使用此功能"
+                android:text="Camera permission is required to use this feature"
                 android:textColor="@android:color/white"
                 android:textSize="16sp"
                 android:gravity="center"
@@ -60,7 +71,7 @@
                 android:id="@+id/btnRetryPermission"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="重试权限" />
+                android:text="Retry Permission" />
 
         </LinearLayout>
 
@@ -95,6 +106,21 @@
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.1" />
+        android:layout_weight="0.05" />
+
+    <Button
+        android:id="@+id/btn_upload"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:text="UPLOAD TO SERVER"
+        android:backgroundTint="#4CAF50"
+        android:textColor="@android:color/white"
+        android:visibility="gone" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="0.05" />
 
 </LinearLayout>
