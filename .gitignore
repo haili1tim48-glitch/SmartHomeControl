@@ -23,3 +23,8 @@ local.properties
 videos/
 uploads/
 Expert-Gestures/
+
+# Python
+flask_server/venv/
+**/__pycache__/
+*.pyc
