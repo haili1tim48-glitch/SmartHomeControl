@@ -312,6 +312,7 @@ class PracticeActivity : ComponentActivity() {
 
     private fun uploadVideos() {
         val uploadUrl = "http://10.0.2.2:5000/upload"
+        val currentGestureName = gestureLabel.replace(" ", "_").uppercase()
 
         // Reset counters
         uploadSuccessCount.set(0)
@@ -320,6 +321,7 @@ class PracticeActivity : ComponentActivity() {
         // Get video files from app's external files directory
         val videoDir = getExternalFilesDir(null)
         Log.d("UploadDebug", "Video directory path: ${videoDir?.absolutePath}")
+        Log.d("UploadDebug", "Target Gesture: $currentGestureName")
 
         if (videoDir == null || !videoDir.exists()) {
             Log.e(TAG, "Video directory not found")
@@ -328,19 +330,21 @@ class PracticeActivity : ComponentActivity() {
         }
 
         // List all files in directory for debugging
-        val allFiles = videoDir.listFiles()
-        Log.d("UploadDebug", "All files in directory: ${allFiles?.map { it.name }}")
+        val allFiles = videoDir.listFiles() ?: emptyArray()
+        Log.d("UploadDebug", "Total files found in Movies dir: ${allFiles.size}")
+        Log.d("UploadDebug", "All files in directory: ${allFiles.map { it.name }}")
 
-        // Filter files ending with _Liang.mp4
+        // Filter files for CURRENT gesture only (e.g. LIGHTON_PRACTICE_*_Liang.mp4)
+        val gesturePrefix = "${currentGestureName}_PRACTICE_"
         val videoFiles = videoDir.listFiles { file ->
-            file.isFile && file.name.endsWith("_Liang.mp4")
+            file.isFile && file.name.startsWith(gesturePrefix) && file.name.endsWith("_Liang.mp4")
         }?.sortedBy { it.name }?.toList() ?: emptyList()
 
-        Log.d("UploadDebug", "Filtered video files: ${videoFiles.map { it.name }}")
+        Log.d("UploadDebug", "Filtered files for current upload: ${videoFiles.map { it.name }}")
 
         if (videoFiles.size < 3) {
-            Log.e(TAG, "Expected 3 videos, found ${videoFiles.size}")
-            Toast.makeText(this, "Not all videos found (${videoFiles.size}/3)", Toast.LENGTH_SHORT).show()
+            Log.e(TAG, "Expected 3 videos for gesture '$currentGestureName', found ${videoFiles.size}")
+            Toast.makeText(this, "Not all videos found for $currentGestureName (${videoFiles.size}/3)", Toast.LENGTH_SHORT).show()
             return
         }
 
@@ -389,7 +393,8 @@ class PracticeActivity : ComponentActivity() {
 
             client.newCall(request).enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
-                    Log.e("UploadDebug", "Upload FAILED for $fileName: ${e.message}", e)
+                    Log.e("UploadDebug", "Upload FAILED for $fileName: ${e.message}")
+                    Log.e("UploadDebug", "Upload failed", e) // Full stack trace
 
                     if (uploadErrorOccurred.compareAndSet(false, true)) {
                         runOnUiThread {
@@ -412,6 +417,12 @@ class PracticeActivity : ComponentActivity() {
                         Log.d("UploadDebug", "Successfully sent: $fileName (progress: $currentSuccess / $totalFiles)")
 
                         if (currentSuccess == totalFiles && !uploadErrorOccurred.get()) {
+                            // Delete uploaded files to prevent contaminating future gestures
+                            for (uploadedFile in filesToUpload) {
+                                val deleted = uploadedFile.delete()
+                                Log.d("UploadDebug", "Cleanup ${uploadedFile.name}: deleted=$deleted")
+                            }
+
                             runOnUiThread {
                                 Log.i(TAG, "All $totalFiles videos uploaded successfully!")
                                 Toast.makeText(
@@ -423,7 +434,9 @@ class PracticeActivity : ComponentActivity() {
                             }
                         }
                     } else {
+                        val errorBody = response.body?.string()
                         Log.e("UploadDebug", "Server error for $fileName: ${response.code}")
+                        Log.e("UploadDebug", "Server rejected: $errorBody")
 
                         if (uploadErrorOccurred.compareAndSet(false, true)) {
                             runOnUiThread {
